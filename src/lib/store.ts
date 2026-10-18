@@ -16,6 +16,17 @@ export interface UserProfileGoals {
   measurementGoals: UserMeasurementGoals;
 }
 
+export interface UserProfile {
+  name: string;
+  age: number | null;
+  gender: "female" | "male" | "other" | "";
+  heightCm: number | null;
+  targetWeightKg: number | null;
+  goal: "lose" | "maintain" | "gain";
+  activityLevel: "low" | "moderate" | "high";
+  dailyCalories: number | null;
+}
+
 export interface MetricEntry {
   id: string;
   date: string;
@@ -71,6 +82,7 @@ interface AppState {
   addReview: boolean;
   addDirty: boolean;
   userGoals: UserProfileGoals;
+  userProfile: UserProfile;
   metricEntries: MetricEntry[];
   selectDate: (date: string) => void;
   setFilter: (filter: string) => void;
@@ -78,6 +90,7 @@ interface AppState {
   setAddDraft: (draft: LifeRecord) => void;
   setAddReview: (review: boolean) => void;
   setUserGoals: (goals: Partial<UserProfileGoals>) => void;
+  setUserProfile: (profile: Partial<UserProfile>) => void;
   addMetricEntry: (entry: MetricEntry) => void;
   prepareAdd: (type?: RecordType) => boolean;
   resetAdd: () => void;
@@ -100,6 +113,16 @@ const makeDefaultState = () => ({
     calorieGoal: 2200,
     weightGoalKg: null,
     measurementGoals: { waistCm: null, chestCm: null, armCm: null, thighCm: null, calfCm: null },
+  },
+  userProfile: {
+    name: "我的目標",
+    age: null,
+    gender: "" as const,
+    heightCm: null,
+    targetWeightKg: null,
+    goal: "maintain" as const,
+    activityLevel: "moderate" as const,
+    dailyCalories: 2200,
   },
   metricEntries: [
     {
@@ -130,6 +153,7 @@ export const useAppStore = create<AppState>()(
       setAddDraft: addDraft => set({ addDraft, addReview: false, addDirty: true }),
       setAddReview: addReview => set({ addReview }),
       setUserGoals: goals => set(state => ({ userGoals: { ...state.userGoals, ...goals, measurementGoals: { ...state.userGoals.measurementGoals, ...(goals.measurementGoals ?? {}) } } })),
+      setUserProfile: profile => set(state => ({ userProfile: { ...state.userProfile, ...profile } })),
       addMetricEntry: entry => set(state => ({ metricEntries: [...state.metricEntries, entry] })),
       prepareAdd: (type = "note") => {
         if (get().addDirty) return false;
@@ -169,6 +193,7 @@ export const useAppStore = create<AppState>()(
         addReview: state.addReview,
         addDirty: state.addDirty,
         userGoals: state.userGoals,
+        userProfile: state.userProfile,
         metricEntries: state.metricEntries,
       }),
     },

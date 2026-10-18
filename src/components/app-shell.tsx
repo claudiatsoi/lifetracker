@@ -24,10 +24,10 @@ export function AppShell() {
       const Icon = route.icon;
       return <NavLink key={route.path} to={route.path} end={route.path === "/"} onClick={() => { if (route.path === "/add-record" && pathname !== route.path) prepareAdd(); }} className={({ isActive }) => cn(
         buttonVariants({ variant: isActive ? "default" : "ghost" }),
-        "h-auto min-w-0 whitespace-normal py-3 text-center focus-visible:outline-offset-2",
-        mobile && "flex-col gap-1 px-2",
-        isActive ? "font-semibold underline underline-offset-4 forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]" : "forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]",
-      )}>{Icon && <Icon className="size-5 shrink-0" aria-hidden="true" />}<span className="min-w-0 break-words">{route.label}</span></NavLink>;
+        "h-auto min-w-0 whitespace-normal text-center focus-visible:outline-offset-2",
+        mobile ? "flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[10px] leading-none" : "py-3",
+        isActive ? "font-semibold shadow-sm forced-colors:bg-[Highlight] forced-colors:text-[HighlightText]" : "forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]",
+      )}>{Icon && <Icon className={cn("shrink-0", mobile ? "size-4" : "size-5")} aria-hidden="true" />}<span className="min-w-0 break-words">{route.label}</span></NavLink>;
     });
   }
   return (
@@ -39,8 +39,10 @@ export function AppShell() {
           <nav aria-label="主要導覽" className="hidden min-w-0 flex-wrap gap-2 md:flex">{navigation(false)}</nav>
         </div>
       </header>
-      <main ref={mainRef} id="main-content" tabIndex={-1} className="min-w-0 flex-1 focus:outline-none"><Outlet /></main>
-      <nav aria-label="主要導覽（手機）" className="sticky bottom-0 z-40 grid grid-cols-2 gap-3 border-t border-border bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">{navigation(true)}</nav>
+      <main ref={mainRef} id="main-content" tabIndex={-1} className="min-w-0 flex-1 pb-20 focus:outline-none md:pb-0"><Outlet /></main>
+      <nav aria-label="主要導覽（手機）" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-2 pb-[max(0.55rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden">
+        <div className="mx-auto flex max-w-md items-center justify-between gap-1">{navigation(true)}</div>
+      </nav>
       <Toaster />
     </div>
   );

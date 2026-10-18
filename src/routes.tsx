@@ -1,9 +1,10 @@
 import type { ReactElement } from "react";
-import { BarChart3, BookOpenText, CalendarDays, Dumbbell, History as HistoryIcon, Plus, Settings2, type LucideIcon } from "lucide-react";
+import { BarChart3, BookOpenText, CalendarDays, Dumbbell, History as HistoryIcon, Plus, Settings2, UserRound, type LucideIcon } from "lucide-react";
 import { HomePage } from "@/pages/home";
 import { AddRecordPage } from "@/pages/add-record";
 import { HistoryPage, ProgressPage, ReflectionsPage, SettingsPage } from "@/pages/feature-pages";
 import { MetricsPage } from "@/pages/metrics";
+import { ProfilePage } from "@/pages/profile";
 
 export interface AppRoute {
   /** "/" is the index route; others are paths under the shell. */
@@ -23,6 +24,7 @@ export interface AppRoute {
 export const routes: AppRoute[] = [
   { path: "/", element: <HomePage />, label: "今天", icon: CalendarDays },
   { path: "/add-record", element: <AddRecordPage />, label: "新增記錄", icon: Plus },
+  { path: "/profile", element: <ProfilePage />, label: "個人", icon: UserRound },
   { path: "/metrics", element: <MetricsPage />, label: "體態", icon: Dumbbell },
   { path: "/history", element: <HistoryPage />, label: "歷程", icon: HistoryIcon },
   { path: "/progress", element: <ProgressPage />, label: "進度", icon: BarChart3 },
