@@ -1,8 +1,12 @@
+import { useMemo, useState } from "react";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ArrowRight, BarChart3, BookOpenText, Clock3, History as HistoryIcon, MoonStar, Settings2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppStore } from "@/lib/store";
-import { recordTypes } from "@/lib/life-data";
+import { recordTypes, shiftDate, today, type RecordType } from "@/lib/life-data";
 
 function exportRecords(records: ReturnType<typeof useAppStore.getState>['records']) {
   const blob = new Blob([JSON.stringify({ version: 1, timeZone: "Asia/Hong_Kong", records }, null, 2)], { type: "application/json" });
@@ -29,16 +33,24 @@ function average(values: Array<number | null>) {
 }
 
 export function HistoryPage() {
-  const records = useAppStore((state) => state.records)
-    .slice()
-    .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
+  const records = useAppStore((state) => state.records);
+  const [selectedType, setSelectedType] = useState<"all" | RecordType>("all");
 
-  const grouped = new Map<string, typeof records>();
-  for (const record of records) {
-    const bucket = grouped.get(record.date) ?? [];
-    bucket.push(record);
-    grouped.set(record.date, bucket);
-  }
+  const filteredRecords = useMemo(() => {
+    return [...records]
+      .filter((record) => selectedType === "all" || record.type === selectedType)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
+  }, [records, selectedType]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, typeof filteredRecords>();
+    for (const record of filteredRecords) {
+      const bucket = map.get(record.date) ?? [];
+      bucket.push(record);
+      map.set(record.date, bucket);
+    }
+    return map;
+  }, [filteredRecords]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-8">
@@ -47,44 +59,65 @@ export function HistoryPage() {
           <p className="text-sm font-medium text-muted-foreground">歷程</p>
           <h1 className="text-3xl font-semibold tracking-tight">完整時間軸</h1>
         </div>
-        <Button variant="outline" className="h-auto whitespace-normal py-2.5">
-          <HistoryIcon className="size-4" aria-hidden="true" />
-          最近更新 {records.length ? formatDate(records[0].date) : "-"}
-        </Button>
+        <div className="flex items-center gap-3">
+          <Select value={selectedType} onValueChange={(value) => setSelectedType(value as "all" | RecordType)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="篩選類型" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">所有記錄</SelectItem>
+              {Object.entries(recordTypes).map(([type, meta]) => (
+                <SelectItem key={type} value={type}>{meta.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" className="h-auto whitespace-normal py-2.5">
+            <HistoryIcon className="size-4" aria-hidden="true" />
+            最近更新 {filteredRecords.length ? formatDate(filteredRecords[0].date) : "-"}
+          </Button>
+        </div>
       </header>
 
       <div className="space-y-5">
-        {Array.from(grouped.entries()).map(([day, dayRecords]) => (
-          <Card key={day} className="overflow-hidden">
-            <CardHeader className="border-b bg-muted/30 pb-4">
-              <CardTitle className="text-lg">{formatDate(day)}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 p-4">
-              {dayRecords.map((record) => (
-                <div key={record.id} className="flex flex-col gap-2 rounded-xl border border-border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                      <span className="font-medium text-foreground">{recordTypes[record.type].label}</span>
-                      <span>•</span>
-                      <time dateTime={`${record.date}T${record.time}:00+08:00`}>{formatTime(record.date, record.time)}</time>
-                    </div>
-                    <p className="break-words text-base font-medium">{record.title}</p>
-                    {record.value !== null && (
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {record.value} {recordTypes[record.type].unit || "項目"}
-                      </p>
-                    )}
-                    {record.notes && <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{record.notes}</p>}
-                  </div>
-                  <Button variant="ghost" size="sm" className="h-auto whitespace-normal px-2 py-1.5 text-xs">
-                    查看
-                    <ArrowRight className="size-3.5" aria-hidden="true" />
-                  </Button>
-                </div>
-              ))}
+        {Array.from(grouped.entries()).length === 0 ? (
+          <Card>
+            <CardContent className="p-10 text-center text-muted-foreground">
+              目前沒有符合篩選條件的記錄。
             </CardContent>
           </Card>
-        ))}
+        ) : (
+          Array.from(grouped.entries()).map(([day, dayRecords]) => (
+            <Card key={day} className="overflow-hidden">
+              <CardHeader className="border-b bg-muted/30 pb-4">
+                <CardTitle className="text-lg">{formatDate(day)}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 p-4">
+                {dayRecords.map((record) => (
+                  <div key={record.id} className="flex flex-col gap-2 rounded-xl border border-border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">{recordTypes[record.type].label}</span>
+                        <span>•</span>
+                        <time dateTime={`${record.date}T${record.time}:00+08:00`}>{formatTime(record.date, record.time)}</time>
+                      </div>
+                      <p className="break-words text-base font-medium">{record.title}</p>
+                      {record.value !== null && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {record.value} {recordTypes[record.type].unit || "項目"}
+                        </p>
+                      )}
+                      {record.notes && <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{record.notes}</p>}
+                    </div>
+                    <Button variant="ghost" size="sm" className="h-auto whitespace-normal px-2 py-1.5 text-xs">
+                      查看
+                      <ArrowRight className="size-3.5" aria-hidden="true" />
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );
@@ -100,6 +133,30 @@ export function ProgressPage() {
     .reduce((sum, record) => sum + (record.value ?? 0), 0);
   const avgSleep = average(records.filter((record) => record.type === "checkin").map((record) => record.value));
   const activeDays = new Set(records.map((record) => record.date)).size;
+
+  const chartData = useMemo(() => {
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = shiftDate(today, index - 6);
+      const dailyExercise = records
+        .filter((record) => record.date === day && record.type === "exercise")
+        .reduce((sum, record) => sum + (record.value ?? 0), 0);
+      const dailyWater = records
+        .filter((record) => record.date === day && record.type === "water")
+        .reduce((sum, record) => sum + (record.value ?? 0), 0);
+      const dailySleep = records
+        .filter((record) => record.date === day && record.type === "checkin")
+        .map((record) => record.value)
+        .filter((value): value is number => value !== null);
+      const avgDailySleep = dailySleep.length ? dailySleep.reduce((sum, value) => sum + value, 0) / dailySleep.length : 0;
+
+      return {
+        day: new Intl.DateTimeFormat("zh-HK", { timeZone: "Asia/Hong_Kong", month: "short", day: "numeric" }).format(new Date(`${day}T12:00:00+08:00`)),
+        exercise: dailyExercise,
+        water: dailyWater,
+        sleep: avgDailySleep,
+      };
+    });
+  }, [records]);
 
   const summary = [
     { label: "總紀錄數", value: String(records.length), icon: Clock3 },
@@ -131,6 +188,32 @@ export function ProgressPage() {
           </Card>
         ))}
       </div>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>過去 7 天趨勢</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <ChartContainer
+            config={{
+              exercise: { label: "運動（分）", color: "#22c55e" },
+              water: { label: "飲水（ml）", color: "#38bdf8" },
+              sleep: { label: "睡眠（小時）", color: "#a78bfa" },
+            }}
+            className="h-[260px] w-full"
+          >
+            <AreaChart data={chartData} margin={{ left: 8, right: 8, top: 10, bottom: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={12} />
+              <YAxis tickLine={false} axisLine={false} fontSize={12} />
+              <ChartTooltip cursor={{ stroke: "#94a3b8", strokeDasharray: "4 4" }} content={<ChartTooltipContent />} />
+              <Area type="monotone" dataKey="exercise" stroke="#22c55e" fill="#22c55e" fillOpacity={0.18} strokeWidth={2} />
+              <Area type="monotone" dataKey="water" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.12} strokeWidth={2} />
+              <Area type="monotone" dataKey="sleep" stroke="#a78bfa" fill="#a78bfa" fillOpacity={0.10} strokeWidth={2} />
+            </AreaChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
     </div>
   );
 }
