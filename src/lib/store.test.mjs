@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { blankRecord, initialRecords, shiftDate, today } from "./life-data.ts";
-import { useAppStore } from "./store.ts";
+import { getPersonalSummary, useAppStore } from "./store.ts";
 
 beforeEach(() => useAppStore.setState({
   records: initialRecords.map(record => ({ ...record })), date: today, filter: "all",
@@ -83,5 +83,28 @@ describe("session state across routes", () => {
     expect(state().addReview).toBe(false);
     expect(state().records).toHaveLength(8);
     expect(state().filter).toBe("water");
+  });
+  test("personal summary reflects the active profile goal and the latest nutrition data", () => {
+    const summary = getPersonalSummary(
+      {
+        name: "Ada",
+        goal: "lose",
+        activityLevel: "moderate",
+        dailyCalories: 2200,
+        heightCm: null,
+        targetWeightKg: 58,
+      },
+      {
+        heightCm: 165,
+        calorieGoal: 2200,
+        weightGoalKg: 58,
+        measurementGoals: { waistCm: null, chestCm: null, armCm: null, thighCm: null, calfCm: null },
+      },
+      [{ date: today, weightKg: 62, caloriesIn: 1900, caloriesBurned: 420, waistCm: 74, chestCm: 88, armCm: 28, thighCm: 50, calfCm: 34 }],
+    );
+    expect(summary.goalLabel).toBe("減脂");
+    expect(summary.calorieBalance).toBe(300);
+    expect(summary.weightDeltaKg).toBe(4);
+    expect(summary.readiness).toMatch(/累積/);
   });
 });

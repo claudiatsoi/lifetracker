@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Activity, ArrowUpRight, Dumbbell, Flame, Goal, Scale, Ruler, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAppStore } from "@/lib/store";
+import { getPersonalSummary, useAppStore } from "@/lib/store";
 import { today } from "@/lib/life-data";
 
 function bmi(weightKg: number | null, heightCm: number | null) {
@@ -16,6 +17,8 @@ function bmi(weightKg: number | null, heightCm: number | null) {
 }
 
 export function MetricsPage() {
+  const navigate = useNavigate();
+  const userProfile = useAppStore((state) => state.userProfile);
   const userGoals = useAppStore((state) => state.userGoals);
   const metricEntries = useAppStore((state) => state.metricEntries);
   const setUserGoals = useAppStore((state) => state.setUserGoals);
@@ -33,7 +36,8 @@ export function MetricsPage() {
   });
 
   const latestEntry = metricEntries.at(-1) ?? null;
-  const currentBmi = bmi(latestEntry?.weightKg ?? null, userGoals.heightCm ?? null);
+  const summary = useMemo(() => getPersonalSummary(userProfile, userGoals, metricEntries), [userProfile, userGoals, metricEntries]);
+  const currentBmi = bmi(latestEntry?.weightKg ?? null, userProfile.heightCm ?? userGoals.heightCm ?? null);
   const trendData = useMemo(() => {
     return [...metricEntries]
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -44,12 +48,12 @@ export function MetricsPage() {
       }));
   }, [metricEntries, userGoals.heightCm]);
   const goalProgress = useMemo(() => {
-    const weightGap = userGoals.weightGoalKg && latestEntry?.weightKg ? Math.abs(latestEntry.weightKg - userGoals.weightGoalKg) : null;
+    const weightGap = summary.weightDeltaKg;
     return {
       weightGap,
-      dailyCalories: userGoals.calorieGoal ? `${Math.max(0, (userGoals.calorieGoal ?? 0) - (latestEntry?.caloriesIn ?? 0))} kcal remaining` : "Set a calorie goal",
+      dailyCalories: summary.calorieBalance >= 0 ? `${summary.calorieBalance} kcal remaining` : `${Math.abs(summary.calorieBalance)} kcal over target`,
     };
-  }, [latestEntry, userGoals]);
+  }, [summary]);
 
   const onSave = () => {
     const payload = {
@@ -75,13 +79,20 @@ export function MetricsPage() {
           <p className="text-sm font-medium text-muted-foreground">體態與目標</p>
           <h1 className="text-3xl font-semibold tracking-tight">身體數據追蹤</h1>
         </div>
-        <Button variant="outline" className="h-auto whitespace-normal py-2.5">
+        <Button variant="outline" className="h-auto whitespace-normal py-2.5" onClick={() => navigate("/profile")}>
           <Target className="size-4" aria-hidden="true" />
           個人目標設定
         </Button>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <Card>
+          <CardHeader className="pb-3"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">目標</span><Target className="size-4 text-muted-foreground" /></div></CardHeader>
+          <CardContent>
+            <div className="text-2xl font-semibold">{summary.goalLabel}</div>
+            <p className="mt-1 text-xs text-muted-foreground">{summary.readiness}</p>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="pb-3"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">體重</span><Scale className="size-4 text-muted-foreground" /></div></CardHeader>
           <CardContent><div className="text-2xl font-semibold">{latestEntry?.weightKg ?? "-"} kg</div></CardContent>
@@ -91,12 +102,8 @@ export function MetricsPage() {
           <CardContent><div className="text-2xl font-semibold">{currentBmi === null ? "-" : currentBmi.toFixed(1)}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-3"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">熱量目標</span><Flame className="size-4 text-muted-foreground" /></div></CardHeader>
-          <CardContent><div className="text-2xl font-semibold">{userGoals.calorieGoal ?? "-"}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">體重目標</span><Goal className="size-4 text-muted-foreground" /></div></CardHeader>
-          <CardContent><div className="text-2xl font-semibold">{userGoals.weightGoalKg ?? "-"} kg</div></CardContent>
+          <CardHeader className="pb-3"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">熱量餘額</span><Flame className="size-4 text-muted-foreground" /></div></CardHeader>
+          <CardContent><div className="text-2xl font-semibold">{summary.calorieBalance} kcal</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">目標差距</span><ArrowUpRight className="size-4 text-muted-foreground" /></div></CardHeader>

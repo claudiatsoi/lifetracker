@@ -40,6 +40,31 @@ export interface MetricEntry {
   calfCm: number | null;
 }
 
+export function getPersonalSummary(
+  profile: Pick<UserProfile, "name" | "goal" | "activityLevel" | "dailyCalories" | "targetWeightKg">,
+  goals: UserProfileGoals,
+  metricEntries: MetricEntry[],
+) {
+  const goalLabel = profile.goal === "lose" ? "減脂" : profile.goal === "gain" ? "增肌" : "維持";
+  const latestEntry = [...metricEntries].sort((a, b) => a.date.localeCompare(b.date)).at(-1) ?? null;
+  const targetWeight = profile.targetWeightKg ?? goals.weightGoalKg ?? null;
+  const targetCalories = profile.dailyCalories ?? goals.calorieGoal ?? 0;
+  const calorieBalance = latestEntry?.caloriesIn !== null && latestEntry?.caloriesIn !== undefined ? targetCalories - latestEntry.caloriesIn : targetCalories;
+  const weightDeltaKg = latestEntry?.weightKg !== null && latestEntry?.weightKg !== undefined && targetWeight !== null ? Math.abs(latestEntry.weightKg - targetWeight) : null;
+  const readiness = weightDeltaKg === null ? "尚未建立目標進度" : weightDeltaKg <= 2 ? "維持穩定狀態，繼續保持節奏" : weightDeltaKg <= 5 ? `累積 ${weightDeltaKg.toFixed(1)} kg 距離目標，保持節奏` : `累積 ${weightDeltaKg.toFixed(1)} kg 距離目標，需要更聚焦`;
+
+  return {
+    goalLabel,
+    targetWeight,
+    targetCalories,
+    calorieBalance,
+    weightDeltaKg,
+    readiness,
+    name: profile.name,
+    activityLevel: profile.activityLevel,
+  };
+}
+
 // Global client state shared across components/routes. ONE module-scoped store,
 // no Provider needed — import `useAppStore` anywhere. Use `useState` for
 // component-local state; let TanStack Query own server/connector data (don't
@@ -152,8 +177,24 @@ export const useAppStore = create<AppState>()(
       setCheckDraft: checkDraft => set({ checkDraft }),
       setAddDraft: addDraft => set({ addDraft, addReview: false, addDirty: true }),
       setAddReview: addReview => set({ addReview }),
-      setUserGoals: goals => set(state => ({ userGoals: { ...state.userGoals, ...goals, measurementGoals: { ...state.userGoals.measurementGoals, ...(goals.measurementGoals ?? {}) } } })),
-      setUserProfile: profile => set(state => ({ userProfile: { ...state.userProfile, ...profile } })),
+      setUserGoals: goals => set(state => ({
+        userGoals: { ...state.userGoals, ...goals, measurementGoals: { ...state.userGoals.measurementGoals, ...(goals.measurementGoals ?? {}) } },
+        userProfile: {
+          ...state.userProfile,
+          ...(goals.heightCm !== undefined ? { heightCm: goals.heightCm } : {}),
+          ...(goals.weightGoalKg !== undefined ? { targetWeightKg: goals.weightGoalKg } : {}),
+          ...(goals.calorieGoal !== undefined ? { dailyCalories: goals.calorieGoal } : {}),
+        },
+      })),
+      setUserProfile: profile => set(state => ({
+        userProfile: { ...state.userProfile, ...profile },
+        userGoals: {
+          ...state.userGoals,
+          ...(profile.heightCm !== undefined ? { heightCm: profile.heightCm } : {}),
+          ...(profile.targetWeightKg !== undefined ? { weightGoalKg: profile.targetWeightKg } : {}),
+          ...(profile.dailyCalories !== undefined ? { calorieGoal: profile.dailyCalories } : {}),
+        },
+      })),
       addMetricEntry: entry => set(state => ({ metricEntries: [...state.metricEntries, entry] })),
       prepareAdd: (type = "note") => {
         if (get().addDirty) return false;
