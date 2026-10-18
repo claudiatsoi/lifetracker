@@ -10,6 +10,7 @@ export interface LifeRecord {
   energy: number | null;
   notes: string;
   originalInput: string;
+  photoDataUrl: string | null;
   estimated: boolean;
   sourceType: "manual";
   confirmation: "confirmed";
@@ -31,7 +32,7 @@ export const recordTypes = {
   checkin: { label: "每日關顧", unit: "小時睡眠", field: "睡眠時數", max: 24 },
 } satisfies Record<RecordType, { label: string; unit: string; field: string; max: number }>;
 const createdAt = `${today}T06:00:00+08:00`;
-const base = { date: today, mood: null, energy: null, notes: "", estimated: false, sourceType: "manual" as const, confirmation: "confirmed" as const, createdAt, updatedAt: createdAt };
+const base = { date: today, mood: null, energy: null, notes: "", originalInput: "", photoDataUrl: null, estimated: false, sourceType: "manual" as const, confirmation: "confirmed" as const, createdAt, updatedAt: createdAt };
 export const initialRecords: LifeRecord[] = [
   { ...base, id: "entry-01", time: "06:50", type: "checkin", title: "每日關顧", value: 7.5, mood: 4, energy: 3, notes: "慢慢開始今天。", originalInput: "瞓咗七個半鐘，心情唔錯，精神一般。" },
   { ...base, id: "entry-02", time: "07:15", type: "water", title: "起床後的一杯水", value: 300, originalInput: "飲水 300 ml" },
@@ -48,9 +49,56 @@ export function blankRecord(date: string, type: RecordType = "note"): LifeRecord
     id: crypto.randomUUID(), date,
     time: new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Hong_Kong", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date()),
     type, title: type === "checkin" ? "每日關顧" : "", value: null, mood: null, energy: null,
-    notes: "", originalInput: "", estimated: type === "meal", sourceType: "manual",
+    notes: "", originalInput: "", photoDataUrl: null, estimated: type === "meal", sourceType: "manual",
     confirmation: "confirmed", createdAt: now, updatedAt: now,
   };
+}
+
+export function extractRecordPieces(input: string, type: RecordType) {
+  const text = input.trim();
+  if (!text) return [];
+
+  const numeric = /(-?\d+(?:\.\d+)?)/;
+  const matches: Array<{ label: string; value: number; unit: string; raw: string }> = [];
+
+  const addMatch = (label: string, value: number, unit: string, raw: string) => {
+    if (Number.isFinite(value) && value >= 0) matches.push({ label, value, unit, raw });
+  };
+
+  switch (type) {
+    case "water": {
+      const found = text.match(/(\d+(?:\.\d+)?)\s*(ml|mL|毫升|l|L|公升|litre|liter)/i);
+      if (found) addMatch("飲水", Number(found[1]), "ml", found[0]);
+      break;
+    }
+    case "meal": {
+      const calories = text.match(/(\d+(?:\.\d+)?)\s*(kcal|cal|卡路里|熱量)/i);
+      if (calories) addMatch("熱量", Number(calories[1]), "kcal", calories[0]);
+      const protein = text.match(/(\d+(?:\.\d+)?)\s*(g|克)\s*(蛋白|protein)/i);
+      if (protein) addMatch("蛋白質", Number(protein[1]), "g", protein[0]);
+      break;
+    }
+    case "exercise":
+    case "activity": {
+      const minutes = text.match(/(\d+(?:\.\d+)?)\s*(min|mins|分鐘|minute|minutes)/i);
+      if (minutes) addMatch(type === "exercise" ? "運動" : "活動", Number(minutes[1]), "min", minutes[0]);
+      break;
+    }
+    case "checkin": {
+      const sleep = text.match(/(\d+(?:\.\d+)?)\s*(h|hr|hrs|小時|hour|hours)/i);
+      if (sleep) addMatch("睡眠", Number(sleep[1]), "h", sleep[0]);
+      break;
+    }
+    default:
+      break;
+  }
+
+  if (type !== "note" && matches.length === 0) {
+    const value = text.match(numeric);
+    if (value) addMatch(type === "checkin" ? "睡眠" : type === "meal" ? "熱量" : "數值", Number(value[1]), type === "water" ? "ml" : type === "meal" ? "kcal" : "min", value[0]);
+  }
+
+  return matches;
 }
 export function validateRecord(record: LifeRecord): string | null {
   if (!record.title.trim() || record.title.length > 120) return "請填寫 1 至 120 字的名稱。";
